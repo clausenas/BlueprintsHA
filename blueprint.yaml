@@ -1,0 +1,56 @@
+blueprint:
+  name: Paralelo Virtual (Seguro)
+  description: >
+    Sincroniza múltiplos interruptores Zigbee (com ou sem carga)
+    usando um estado virtual e um único relé físico.
+    Evita loops e funciona com lâmpadas convencionais.
+  domain: automation
+
+  input:
+    entrada_switches:
+      name: Interruptores de entrada
+      description: Interruptores que o usuário vai apertar
+      selector:
+        entity:
+          domain: switch
+          multiple: true
+
+    switch_rele:
+      name: Interruptor com relé físico
+      description: Único switch que realmente liga a lâmpada
+      selector:
+        entity:
+          domain: switch
+
+    estado_virtual:
+      name: Estado virtual (input_boolean)
+      description: Estado central do paralelo virtual
+      selector:
+        entity:
+          domain: input_boolean
+
+trigger:
+  - platform: state
+    entity_id: !input entrada_switches
+
+action:
+  - choose:
+      # QUALQUER ON → liga virtual
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == 'on' }}"
+        sequence:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: !input estado_virtual
+
+      # QUALQUER OFF → desliga virtual
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == 'off' }}"
+        sequence:
+          - service: input_boolean.turn_off
+            target:
+              entity_id: !input estado_virtual
+
+mode: restart
