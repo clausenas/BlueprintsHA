@@ -1,56 +1,46 @@
 blueprint:
-  name: Paralelo Virtual (Seguro)
-  description: >
-    Sincroniza múltiplos interruptores Zigbee (com ou sem carga)
-    usando um estado virtual e um único relé físico.
-    Evita loops e funciona com lâmpadas convencionais.
+  name: Paralelo Virtual (sem loop)
+  description: Acende/Apaga todos os switchs/lights do grupo simultaneamente, sem loop
   domain: automation
-
   input:
-    entrada_switches:
-      name: Interruptores de entrada
-      description: Interruptores que o usuário vai apertar
+    entrada_switchs:
+      name: Escolha os pontos de Iluminação
       selector:
         entity:
-          domain: switch
+          domain:
+            - switch
+            - light
           multiple: true
-
-    switch_rele:
-      name: Interruptor com relé físico
-      description: Único switch que realmente liga a lâmpada
-      selector:
-        entity:
-          domain: switch
-
-    estado_virtual:
-      name: Estado virtual (input_boolean)
-      description: Estado central do paralelo virtual
-      selector:
-        entity:
-          domain: input_boolean
 
 trigger:
   - platform: state
-    entity_id: !input entrada_switches
+    entity_id: !input entrada_switchs
+
+# 🔒 Evita loop e mudanças falsas
+condition:
+  - condition: template
+    value_template: >
+      {{ trigger.from_state is not none and
+         trigger.to_state is not none and
+         trigger.from_state.state != trigger.to_state.state }}
 
 action:
   - choose:
-      # QUALQUER ON → liga virtual
       - conditions:
           - condition: template
             value_template: "{{ trigger.to_state.state == 'on' }}"
         sequence:
-          - service: input_boolean.turn_on
+          - service: homeassistant.turn_on
             target:
-              entity_id: !input estado_virtual
+              entity_id: !input entrada_switchs
 
-      # QUALQUER OFF → desliga virtual
       - conditions:
           - condition: template
             value_template: "{{ trigger.to_state.state == 'off' }}"
         sequence:
-          - service: input_boolean.turn_off
+          - service: homeassistant.turn_off
             target:
-              entity_id: !input estado_virtual
+              entity_id: !input entrada_switchs
 
-mode: restart
+mode: queued
+max: 5
