@@ -1,10 +1,11 @@
 blueprint:
-  name: Paralelo Virtual (sem loop)
-  description: Acende/Apaga todos os switchs/lights do grupo simultaneamente, sem loop
+  name: Paralelo Virtual (lock selecionável)
+  description: Paralelo virtual sem loop, com lock dinâmico
   domain: automation
+
   input:
     entrada_switchs:
-      name: Escolha os pontos de Iluminação
+      name: Interruptores / Luzes
       selector:
         entity:
           domain:
@@ -12,12 +13,23 @@ blueprint:
             - light
           multiple: true
 
+    lock_helper:
+      name: Lock de proteção (input_boolean)
+      description: Crie um helper input_boolean por circuito
+      selector:
+        entity:
+          domain:
+            - input_boolean
+
 trigger:
   - platform: state
     entity_id: !input entrada_switchs
 
-# 🔒 Evita loop e mudanças falsas
 condition:
+  - condition: state
+    entity_id: !input lock_helper
+    state: "off"
+
   - condition: template
     value_template: >
       {{ trigger.from_state is not none and
@@ -25,6 +37,11 @@ condition:
          trigger.from_state.state != trigger.to_state.state }}
 
 action:
+  # 🔒 Lock
+  - service: input_boolean.turn_on
+    target:
+      entity_id: !input lock_helper
+
   - choose:
       - conditions:
           - condition: template
@@ -42,5 +59,12 @@ action:
             target:
               entity_id: !input entrada_switchs
 
-mode: queued
-max: 5
+  # 🔓 Unlock rápido
+  - delay:
+      milliseconds: 300
+
+  - service: input_boolean.turn_off
+    target:
+      entity_id: !input lock_helper
+
+mode: restart
