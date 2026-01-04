@@ -1,5 +1,5 @@
 blueprint:
-  name: Paralelo Virtual (compatível HA novo)
+  name: Paralelo Virtual (HA novo – fix)
   description: Paralelo virtual sem loop, com lock dinâmico
   domain: automation
 
@@ -35,13 +35,11 @@ action:
     target:
       entity_id: !input lock_helper
 
-  - variables:
-      estado: "{{ states(trigger.entity_id) }}"
-
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ estado == 'on' }}"
+            value_template: >
+              {{ states(trigger.entity_id) == 'on' }}
         sequence:
           - service: homeassistant.turn_on
             target:
@@ -49,13 +47,14 @@ action:
 
       - conditions:
           - condition: template
-            value_template: "{{ estado == 'off' }}"
+            value_template: >
+              {{ states(trigger.entity_id) == 'off' }}
         sequence:
           - service: homeassistant.turn_off
             target:
               entity_id: !input entrada_switchs
 
-  # 🔓 Unlock rápido
+  # 🔓 Unlock
   - delay:
       milliseconds: 300
 
