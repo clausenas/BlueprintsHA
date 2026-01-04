@@ -64,4 +64,3 @@ action:
       entity_id: !input lock_helper
 
 mode: queued
-max: 1
