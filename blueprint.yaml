@@ -21,8 +21,9 @@ action:
   - variables:
       origem: "{{ trigger.entity_id }}"
       estado: "{{ states(trigger.entity_id) }}"
+      lista_entidades: !input entrada_switchs
       destinos: >
-        {{ expand(!input entrada_switchs)
+        {{ expand(lista_entidades)
            | selectattr('entity_id', '!=', trigger.entity_id)
            | map(attribute='entity_id')
            | list }}
