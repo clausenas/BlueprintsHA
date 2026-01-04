@@ -1,5 +1,5 @@
 blueprint:
-  name: Paralelo Virtual
+  name: Paralelo Virtual (sem helper, sem loop – FINAL)
   description: Paralelo virtual sem helper e sem loop
   domain: automation
 
@@ -21,9 +21,8 @@ action:
   - variables:
       origem: "{{ trigger.entity_id }}"
       estado: "{{ states(trigger.entity_id) }}"
-      lista_entidades: !input entrada_switchs
       destinos: >
-        {{ expand(lista_entidades)
+        {{ expand(entrada_switchs)
            | selectattr('entity_id', '!=', trigger.entity_id)
            | map(attribute='entity_id')
            | list }}
