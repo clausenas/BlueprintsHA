@@ -41,7 +41,6 @@ action:
                    | selectattr('state', '!=', 'on')
                    | map(attribute='entity_id')
                    | list }}
-            continue_on_error: true
 
       - conditions:
           - condition: template
@@ -54,6 +53,5 @@ action:
                    | selectattr('state', '!=', 'off')
                    | map(attribute='entity_id')
                    | list }}
-            continue_on_error: true
 
 mode: queued
