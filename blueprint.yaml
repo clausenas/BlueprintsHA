@@ -1,6 +1,6 @@
 blueprint:
-  name: Paralelo Virtual (sem helper, sem loop – FINAL)
-  description: Paralelo virtual sem helper e sem loop
+  name: Paralelo Virtual (HA novo – estável)
+  description: Paralelo virtual sem helper e sem loop (método nativo)
   domain: automation
 
   input:
@@ -17,31 +17,36 @@ trigger:
   - platform: state
     entity_id: !input entrada_switchs
 
+condition:
+  - condition: template
+    value_template: >
+      {{ trigger.to_state is not none and
+         trigger.from_state is not none and
+         trigger.to_state.state != trigger.from_state.state }}
+
 action:
-  - variables:
-      origem: "{{ trigger.entity_id }}"
-      estado: "{{ states(trigger.entity_id) }}"
-      destinos: >
-        {{ expand(entrada_switchs)
-           | selectattr('entity_id', '!=', trigger.entity_id)
-           | map(attribute='entity_id')
-           | list }}
+  - repeat:
+      for_each: !input entrada_switchs
+      sequence:
+        - condition: template
+          value_template: >
+            {{ repeat.item != trigger.entity_id }}
 
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ estado == 'on' }}"
-        sequence:
-          - service: homeassistant.turn_on
-            target:
-              entity_id: "{{ destinos }}"
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ trigger.to_state.state == 'on' }}"
+              sequence:
+                - service: homeassistant.turn_on
+                  target:
+                    entity_id: "{{ repeat.item }}"
 
-      - conditions:
-          - condition: template
-            value_template: "{{ estado == 'off' }}"
-        sequence:
-          - service: homeassistant.turn_off
-            target:
-              entity_id: "{{ destinos }}"
+            - conditions:
+                - condition: template
+                  value_template: "{{ trigger.to_state.state == 'off' }}"
+              sequence:
+                - service: homeassistant.turn_off
+                  target:
+                    entity_id: "{{ repeat.item }}"
 
 mode: queued
