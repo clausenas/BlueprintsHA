@@ -20,6 +20,15 @@ blueprint:
           domain:
             - input_boolean
 
+    unlock_timeout:
+      name: Timeout de segurança (segundos)
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 10
+          unit_of_measurement: s
+
 trigger:
   - platform: state
     entity_id: !input entrada_switchs
@@ -54,9 +63,14 @@ action:
             target:
               entity_id: !input entrada_switchs
 
-  # 🔓 Unlock
-  - delay:
-      milliseconds: 300
+  # ⏱️ auto-unlock garantido
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input lock_helper
+        to: "off"
+    timeout:
+      seconds: !input unlock_timeout
+    continue_on_timeout: true
 
   - service: input_boolean.turn_off
     target:
