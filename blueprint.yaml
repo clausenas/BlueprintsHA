@@ -1,6 +1,6 @@
 blueprint:
-  name: Paralelo Virtual (lock selecionável)
-  description: Paralelo virtual sem loop, com lock dinâmico
+  name: Paralelo Virtual
+  description: Paralelo virtual sem helper e sem loop
   domain: automation
 
   input:
@@ -13,58 +13,35 @@ blueprint:
             - light
           multiple: true
 
-    lock_helper:
-      name: Lock de proteção (input_boolean)
-      description: Crie um helper input_boolean por circuito
-      selector:
-        entity:
-          domain:
-            - input_boolean
-
 trigger:
   - platform: state
     entity_id: !input entrada_switchs
 
-condition:
-  - condition: state
-    entity_id: !input lock_helper
-    state: "off"
-
-  - condition: template
-    value_template: >
-      {{ trigger.from_state is not none and
-         trigger.to_state is not none and
-         trigger.from_state.state != trigger.to_state.state }}
-
 action:
-  # 🔒 Lock
-  - service: input_boolean.turn_on
-    target:
-      entity_id: !input lock_helper
+  - variables:
+      origem: "{{ trigger.entity_id }}"
+      estado: "{{ states(trigger.entity_id) }}"
+      destinos: >
+        {{ expand(!input entrada_switchs)
+           | selectattr('entity_id', '!=', trigger.entity_id)
+           | map(attribute='entity_id')
+           | list }}
 
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ trigger.to_state.state == 'on' }}"
+            value_template: "{{ estado == 'on' }}"
         sequence:
           - service: homeassistant.turn_on
             target:
-              entity_id: !input entrada_switchs
+              entity_id: "{{ destinos }}"
 
       - conditions:
           - condition: template
-            value_template: "{{ trigger.to_state.state == 'off' }}"
+            value_template: "{{ estado == 'off' }}"
         sequence:
           - service: homeassistant.turn_off
             target:
-              entity_id: !input entrada_switchs
+              entity_id: "{{ destinos }}"
 
-  # 🔓 Unlock rápido
-  - delay:
-      milliseconds: 300
-
-  - service: input_boolean.turn_off
-    target:
-      entity_id: !input lock_helper
-
-mode: restart
+mode: queued
