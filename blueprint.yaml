@@ -1,6 +1,6 @@
 blueprint:
-  name: Paralelo Virtual (Lock início / fim – TESTE)
-  description: Paralelo virtual com lock simples para teste de estabilidade
+  name: Paralelo Virtual (Lock + Idempotente)
+  description: Paralelo virtual sem loop, com lock no início/fim e sincronização inteligente
   domain: automation
 
   input:
@@ -25,34 +25,44 @@ trigger:
     entity_id: !input entrada_switchs
 
 action:
+  # Variável local para uso em templates (IMPORTANTE)
+  - variables:
+      destinos: !input entrada_switchs
+
   # 🔒 Lock no início
   - service: input_boolean.turn_on
     target:
       entity_id: !input lock_helper
 
-  # 🔁 Sincronização
+  # 🔁 Sincronização idempotente (SEM LOOP)
   - choose:
       - conditions:
           - condition: template
-            value_template: >
-              {{ trigger.to_state.state == 'on' }}
+            value_template: "{{ trigger.to_state.state == 'on' }}"
         sequence:
           - service: homeassistant.turn_on
             target:
-              entity_id: !input entrada_switchs
+              entity_id: >
+                {{ expand(destinos)
+                   | selectattr('state', '!=', 'on')
+                   | map(attribute='entity_id')
+                   | list }}
             continue_on_error: true
 
       - conditions:
           - condition: template
-            value_template: >
-              {{ trigger.to_state.state == 'off' }}
+            value_template: "{{ trigger.to_state.state == 'off' }}"
         sequence:
           - service: homeassistant.turn_off
             target:
-              entity_id: !input entrada_switchs
+              entity_id: >
+                {{ expand(destinos)
+                   | selectattr('state', '!=', 'off')
+                   | map(attribute='entity_id')
+                   | list }}
             continue_on_error: true
 
-  # 🔓 Unlock no final
+  # 🔓 Unlock no final (sem tempo fixo)
   - service: input_boolean.turn_off
     target:
       entity_id: !input lock_helper
