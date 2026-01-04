@@ -1,5 +1,5 @@
 blueprint:
-  name: Paralelo Virtual (HA novo – fix)
+  name: Paralelo Virtual (Com Lock)
   description: Paralelo virtual sem loop, com lock dinâmico
   domain: automation
 
