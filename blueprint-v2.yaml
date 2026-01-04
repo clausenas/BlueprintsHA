@@ -1,5 +1,5 @@
 blueprint:
-  name: Paralelo Virtual (Sem Helper – Final Confiável)
+  name: Paralelo Virtual (Sem Helper – Final 100%)
   description: Paralelo virtual sem loop, sem helper, sincronização instantânea mesmo com clique rápido
   domain: automation
 
@@ -18,7 +18,7 @@ trigger:
     entity_id: !input entrada_switchs
 
 condition:
-  # Ignora eventos gerados pela própria automação
+  # Ignora eventos gerados pela própria automação (evita loop)
   - condition: template
     value_template: >
       {{ trigger.to_state.context.parent_id is none }}
@@ -27,31 +27,26 @@ action:
   - variables:
       destinos: !input entrada_switchs
       novo_estado: "{{ trigger.to_state.state }}"
+      outros: >
+        {% set l = [] %}
+        {% for e in destinos %}
+          {% if e != trigger.entity_id %}
+            {% set l = l + [e] %}
+          {% endif %}
+        {% endfor %}
+        {{ l }}
 
-  # 🔁 Sincronização sem depender do estado atual, exceto o trigger
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ novo_estado == 'on' }}"
-        sequence:
-          - service: homeassistant.turn_on
-            target:
-              entity_id: >
-                {{ expand(destinos)
-                   | rejectattr('entity_id','equalto',trigger.entity_id)
-                   | map(attribute='entity_id')
-                   | list }}
-
-      - conditions:
-          - condition: template
-            value_template: "{{ novo_estado == 'off' }}"
-        sequence:
-          - service: homeassistant.turn_off
-            target:
-              entity_id: >
-                {{ expand(destinos)
-                   | rejectattr('entity_id','equalto',trigger.entity_id)
-                   | map(attribute='entity_id')
-                   | list }}
+  # 🔁 Aplica o novo estado a todos os dispositivos exceto o trigger
+  - repeat:
+      for_each: "{{ outros }}"
+      sequence:
+        - service: >
+            {% if novo_estado == 'on' %}
+              homeassistant.turn_on
+            {% else %}
+              homeassistant.turn_off
+            {% endif %}
+          target:
+            entity_id: "{{ repeat.item }}"
 
 mode: queued
