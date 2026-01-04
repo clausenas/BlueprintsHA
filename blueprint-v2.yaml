@@ -1,0 +1,58 @@
+blueprint:
+  name: Paralelo Virtual (Sem Helper – Context)
+  description: Paralelo virtual sem loop usando context.parent_id
+  domain: automation
+
+  input:
+    entrada_switchs:
+      name: Interruptores / Luzes
+      selector:
+        entity:
+          domain:
+            - switch
+            - light
+          multiple: true
+
+trigger:
+  - platform: state
+    entity_id: !input entrada_switchs
+
+condition:
+  # 🚫 Ignora eventos gerados pela própria automação
+  - condition: template
+    value_template: >
+      {{ trigger.to_state.context.parent_id is none }}
+
+action:
+  - variables:
+      destinos: !input entrada_switchs
+
+  # 🔁 Sincronização idempotente
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == 'on' }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: >
+                {{ expand(destinos)
+                   | selectattr('state', '!=', 'on')
+                   | map(attribute='entity_id')
+                   | list }}
+            continue_on_error: true
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == 'off' }}"
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: >
+                {{ expand(destinos)
+                   | selectattr('state', '!=', 'off')
+                   | map(attribute='entity_id')
+                   | list }}
+            continue_on_error: true
+
+mode: queued
