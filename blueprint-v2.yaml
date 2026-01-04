@@ -1,6 +1,6 @@
 blueprint:
-  name: Paralelo Virtual (Sem Helper – Final 100%)
-  description: Paralelo virtual sem loop, sem helper, sincronização confiável mesmo com clique rápido
+  name: Paralelo Virtual (Sem Helper – Final Confiável)
+  description: Paralelo virtual sem loop, sem helper, sincronização instantânea mesmo com clique rápido
   domain: automation
 
   input:
@@ -28,7 +28,7 @@ action:
       destinos: !input entrada_switchs
       novo_estado: "{{ trigger.to_state.state }}"
 
-  # 🔁 Sincronização usando choose (idempotente)
+  # 🔁 Sincronização sem depender do estado atual, exceto o trigger
   - choose:
       - conditions:
           - condition: template
@@ -38,7 +38,7 @@ action:
             target:
               entity_id: >
                 {{ expand(destinos)
-                   | selectattr('state', '!=', 'on')
+                   | rejectattr('entity_id','equalto',trigger.entity_id)
                    | map(attribute='entity_id')
                    | list }}
 
@@ -50,7 +50,7 @@ action:
             target:
               entity_id: >
                 {{ expand(destinos)
-                   | selectattr('state', '!=', 'off')
+                   | rejectattr('entity_id','equalto',trigger.entity_id)
                    | map(attribute='entity_id')
                    | list }}
 
