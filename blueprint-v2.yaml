@@ -1,6 +1,6 @@
 blueprint:
-  name: Paralelo Virtual (Sem Helper – Final)
-  description: Paralelo virtual sem loop usando context.parent_id, sincroniza todos exceto trigger
+  name: Paralelo Virtual (Sem Helper – Final 100%)
+  description: Paralelo virtual sem loop, sem helper, sincronização confiável mesmo com clique rápido
   domain: automation
 
   input:
@@ -26,35 +26,28 @@ condition:
 action:
   - variables:
       destinos: !input entrada_switchs
+      # Determina o estado final: se o trigger está ON → todos ON; se trigger OFF → todos OFF
+      novo_estado: "{{ trigger.to_state.state }}"
 
-  # 🔁 Sincronização idempotente, exceto o trigger
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.to_state.state == 'on' }}"
-        sequence:
-          - service: homeassistant.turn_on
-            target:
-              entity_id: >
-                {{ expand(destinos)
-                   | rejectattr('entity_id', 'equalto', trigger.entity_id)
-                   | selectattr('state', '!=', 'on')
-                   | map(attribute='entity_id')
-                   | list }}
-            continue_on_error: true
+  # 🔁 Sincronização idempotente: aplica novo_estado a todos que estão diferentes
+  - service: homeassistant.turn_on
+    if: "{{ novo_estado == 'on' }}"
+    target:
+      entity_id: >
+        {{ expand(destinos)
+           | selectattr('state', '!=', 'on')
+           | map(attribute='entity_id')
+           | list }}
+    continue_on_error: true
 
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.to_state.state == 'off' }}"
-        sequence:
-          - service: homeassistant.turn_off
-            target:
-              entity_id: >
-                {{ expand(destinos)
-                   | rejectattr('entity_id', 'equalto', trigger.entity_id)
-                   | selectattr('state', '!=', 'off')
-                   | map(attribute='entity_id')
-                   | list }}
-            continue_on_error: true
+  - service: homeassistant.turn_off
+    if: "{{ novo_estado == 'off' }}"
+    target:
+      entity_id: >
+        {{ expand(destinos)
+           | selectattr('state', '!=', 'off')
+           | map(attribute='entity_id')
+           | list }}
+    continue_on_error: true
 
 mode: queued
