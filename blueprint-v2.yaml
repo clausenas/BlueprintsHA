@@ -1,6 +1,6 @@
 blueprint:
-  name: Paralelo Virtual (Sem Helper – Context)
-  description: Paralelo virtual sem loop usando context.parent_id
+  name: Paralelo Virtual (Sem Helper – Final)
+  description: Paralelo virtual sem loop usando context.parent_id, sincroniza todos exceto trigger
   domain: automation
 
   input:
@@ -27,7 +27,7 @@ action:
   - variables:
       destinos: !input entrada_switchs
 
-  # 🔁 Sincronização idempotente
+  # 🔁 Sincronização idempotente, exceto o trigger
   - choose:
       - conditions:
           - condition: template
@@ -37,6 +37,7 @@ action:
             target:
               entity_id: >
                 {{ expand(destinos)
+                   | rejectattr('entity_id', 'equalto', trigger.entity_id)
                    | selectattr('state', '!=', 'on')
                    | map(attribute='entity_id')
                    | list }}
@@ -50,6 +51,7 @@ action:
             target:
               entity_id: >
                 {{ expand(destinos)
+                   | rejectattr('entity_id', 'equalto', trigger.entity_id)
                    | selectattr('state', '!=', 'off')
                    | map(attribute='entity_id')
                    | list }}
