@@ -1,6 +1,6 @@
 blueprint:
-  name: Paralelo Virtual (HA novo – sem loop real)
-  description: Paralelo virtual sem helper e sem loop usando context
+  name: Paralelo Virtual (Com Lock)
+  description: Paralelo virtual sem loop, com lock dinâmico
   domain: automation
 
   input:
@@ -13,44 +13,67 @@ blueprint:
             - light
           multiple: true
 
+    lock_helper:
+      name: Lock de proteção (input_boolean)
+      selector:
+        entity:
+          domain:
+            - input_boolean
+
+    unlock_timeout:
+      name: Timeout de segurança (segundos)
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 10
+          unit_of_measurement: s
+
 trigger:
   - platform: state
     entity_id: !input entrada_switchs
 
 condition:
-  - condition: template
-    value_template: >
-      {{ trigger.to_state is not none and
-         trigger.from_state is not none and
-         trigger.to_state.state != trigger.from_state.state }}
-
-  - condition: template
-    value_template: >
-      {{ trigger.to_state.context.parent_id is none }}
+  - condition: state
+    entity_id: !input lock_helper
+    state: "off"
 
 action:
-  - repeat:
-      for_each: !input entrada_switchs
-      sequence:
-        - condition: template
-          value_template: >
-            {{ repeat.item != trigger.entity_id }}
+  # 🔒 Lock
+  - service: input_boolean.turn_on
+    target:
+      entity_id: !input lock_helper
 
-        - choose:
-            - conditions:
-                - condition: template
-                  value_template: "{{ trigger.to_state.state == 'on' }}"
-              sequence:
-                - service: homeassistant.turn_on
-                  target:
-                    entity_id: "{{ repeat.item }}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ states(trigger.entity_id) == 'on' }}
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input entrada_switchs
 
-            - conditions:
-                - condition: template
-                  value_template: "{{ trigger.to_state.state == 'off' }}"
-              sequence:
-                - service: homeassistant.turn_off
-                  target:
-                    entity_id: "{{ repeat.item }}"
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ states(trigger.entity_id) == 'off' }}
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input entrada_switchs
+
+  # ⏱️ auto-unlock garantido
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input lock_helper
+        to: "off"
+    timeout:
+      seconds: !input unlock_timeout
+    continue_on_timeout: true
+
+  - service: input_boolean.turn_off
+    target:
+      entity_id: !input lock_helper
 
 mode: queued
